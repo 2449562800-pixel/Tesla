@@ -43,14 +43,9 @@ REPORTS = {
 # ============================================================
 TWITTER_ACCOUNTS = [
     {"handle": "SawyerMerritt",    "name": "Sawyer Merritt",    "zh": "Sawyer Merritt"},
-    {"handle": "ChuckCook95",      "name": "Chuck Cook",       "zh": "Chuck Cook"},
-    {"handle": "greentheonly",     "name": "green",             "zh": "green"},
-    {"handle": "DirtyTesla",       "name": "Dirty Tesla",       "zh": "Dirty Tesla"},
-    {"handle": "brandonee916",     "name": "Brandon",           "zh": "Brandon"},
     {"handle": "WholeMarsBlog",    "name": "Whole Mars Catalog", "zh": "Whole Mars"},
     {"handle": "elonmusk",         "name": "Elon Musk",         "zh": "马斯克"},
     {"handle": "Tesla_AI",         "name": "Tesla AI",          "zh": "Tesla AI"},
-    {"handle": "Tesla",            "name": "Tesla",             "zh": "Tesla官方"},
 ]
 
 # Strict FSD / Autopilot / Tesla-tech keywords (morning only)
@@ -84,12 +79,6 @@ MORNING_RSS_FEEDS = [
                   "robotaxi", "autonomous", "release notes"]},
     {"name": "InsideEVs", "url": "https://insideevs.com/rss/", "lang": "en",
      "keywords": ["fsd", "autopilot", "self-driving", "tesla", "robotaxi"]},
-    {"name": "Tesmanian", "url": "https://www.tesmanian.com/feed", "lang": "en",
-     "keywords": ["fsd", "autopilot", "self-driving", "robotaxi", "optimus", "autonomous"]},
-    {"name": "Tesla North", "url": "https://teslanorth.com/feed", "lang": "en",
-     "keywords": ["fsd", "autopilot", "self-driving", "robotaxi", "optimus", "autonomous"]},
-    {"name": "EV Annex", "url": "https://evannex.com/blogs/news.atom", "lang": "en",
-     "keywords": ["fsd", "autopilot", "self-driving", "tesla", "robotaxi"]},
     {"name": "36氪", "url": "https://36kr.com/feed", "lang": "zh",
      "keywords": ["FSD", "特斯拉自动驾驶", "Robotaxi", "Optimus", "特斯拉AI", "特斯拉智驾"]},
     {"name": "IT之家", "url": "https://www.ithome.com/rss/", "lang": "zh",
@@ -98,18 +87,12 @@ MORNING_RSS_FEEDS = [
      "keywords": ["特斯拉", "FSD", "自动驾驶", "智驾", "Robotaxi", "特斯拉AI"]},
     {"name": "懂车帝", "url": "https://www.dongchedi.com/rss", "lang": "zh",
      "keywords": ["特斯拉", "FSD", "自动驾驶", "智驾", "Robotaxi"]},
-    {"name": "太平洋汽车", "url": "https://www.pcauto.com.cn/rss/", "lang": "zh",
-     "keywords": ["特斯拉", "FSD", "自动驾驶", "智驾"]},
-    {"name": "新浪汽车", "url": "https://auto.sina.com.cn/rss/", "lang": "zh",
-     "keywords": ["特斯拉", "FSD", "自动驾驶", "智驾", "Robotaxi"]},
 ]
 
 # RSSHub search routes (proxied through RSSHub — works from GitHub Actions)
 MORNING_RSSHUB_SEARCH = [
     {"name": "RSSHub·Google·FSD", "url": "https://rsshub.app/google/news/search/tesla%20fsd%20autopilot", "lang": "en",
      "keywords": ["fsd", "autopilot", "self-driving", "robotaxi", "optimus", "autonomous", "tesla"]},
-    {"name": "RSSHub·Reddit·Tesla", "url": "https://rsshub.app/reddit/subreddit/teslamotors/hot", "lang": "en",
-     "keywords": ["fsd", "autopilot", "self-driving", "robotaxi", "optimus", "autonomous"]},
 ]
 
 # Google News RSS search (direct, as backup — works from GitHub Actions US servers)
@@ -354,7 +337,7 @@ def fetch_feed(feed_cfg, hours):
     items = []
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     try:
-        r = s.get(feed_cfg["url"], timeout=8, allow_redirects=True)
+        r = s.get(feed_cfg["url"], timeout=5, allow_redirects=True)
         if r.status_code != 200:
             return items
         d = feedparser.parse(r.text)
@@ -431,7 +414,7 @@ def fetch_google_news(query_cfg, hours):
     else:
         url = f"https://news.google.com/rss/search?q={requests.utils.quote(query)}&hl=en&gl=US&ceid=US:en"
     try:
-        r = s.get(url, timeout=12, allow_redirects=True,
+        r = s.get(url, timeout=6, allow_redirects=True,
                   headers={"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"})
         if r.status_code != 200: return items
         d = feedparser.parse(r.text)
@@ -498,7 +481,7 @@ def fetch_twitter_account(account, hours):
 
     # 1) RSSHub Twitter
     try:
-        r = s_get(f"https://rsshub.app/twitter/user/{handle}", timeout=4)
+        r = s_get(f"https://rsshub.app/twitter/user/{handle}", timeout=3)
         if r and r.status_code == 200:
             d = feedparser.parse(r.text)
             for entry in d.entries:
@@ -530,7 +513,7 @@ def fetch_twitter_account(account, hours):
         for instance in ["nitter.poast.org", "nitter.privacydev.net"]:
             try:
                 url = f"https://{instance}/{handle}/rss"
-                r = s_get(url, timeout=3)
+                r = s_get(url, timeout=2)
                 if not r or r.status_code != 200 or len(r.text) < 100: continue
                 d = feedparser.parse(r.text)
                 for entry in d.entries:
@@ -563,7 +546,7 @@ def fetch_weibo_user(founder, hours):
     items = []
     try:
         rsshub_url = f"https://rsshub.app/weibo/user/{uid}"
-        r = s_get(rsshub_url, timeout=6)
+        r = s_get(rsshub_url, timeout=4)
         if not r or r.status_code != 200: return items
         d = feedparser.parse(r.text)
     except Exception:
@@ -592,7 +575,7 @@ def fetch_weibo_user(founder, hours):
 
 
 # Helper functions for DRY
-def s_get(url, timeout=8):
+def s_get(url, timeout=5):
     try:
         return _get_session().get(url, timeout=timeout, allow_redirects=True)
     except Exception:
