@@ -1,2 +1,2 @@
 requests==2.31.0
-openai==1.57.0
+feedparser==6.0.11

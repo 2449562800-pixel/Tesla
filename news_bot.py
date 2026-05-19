@@ -2,185 +2,187 @@ import os
 import sys
 import json
 import smtplib
+import re
+import feedparser
 import requests
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-from datetime import datetime, timedelta
-from openai import OpenAI
+from datetime import datetime, timedelta, timezone
+from html import unescape
 
 # ============================================================
-# CONFIG
+# CONFIG - No API keys needed!
 # ============================================================
-OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY")
-SCT_SENDKEY = os.environ.get("SCT_SENDKEY")
-ICLOUD_USER = os.environ.get("ICLOUD_USER")
-ICLOUD_PASS = os.environ.get("ICLOUD_PASS")
+SCT_SENDKEY = os.environ.get("SCT_SENDKEY", "")
+ICLOUD_USER = os.environ.get("ICLOUD_USER", "")
+ICLOUD_PASS = os.environ.get("ICLOUD_PASS", "")
 
 REPORT_TYPE = sys.argv[1] if len(sys.argv) > 1 else "morning"
 
+BEIJING = timezone(timedelta(hours=8))
+
 REPORTS = {
-    "morning": {
-        "title": "特斯拉晨报",
-        "emoji": "🚗",
-        "prompt": (
-            "你是一个特斯拉新闻编辑。请搜索并整理过去12小时内（从昨晚到今早）的特斯拉相关重要新闻。\n"
-            "搜索来源包括：Electrek、Tesla官方、马斯克X(Twitter)动态、36氪、虎嗅等。\n"
-            "重点关注：FSD自动驾驶进展、特斯拉新车/产品动态、中国市场消息、股价重要变动、马斯克言论。\n"
-            "请用中文整理，每条新闻包含：标题、来源、日期、简短摘要。\n"
-            "按板块分类：FSD动态、产品/市场、中国动态、其他重要消息。\n"
-            "每个板块2-4条新闻，总共8-12条。如果没有某板块的新闻就省略该板块。"
-        ),
-    },
-    "noon": {
-        "title": "新能源午报",
-        "emoji": "⚡",
-        "prompt": (
-            "你是一个中国新能源汽车新闻编辑。请搜索并整理过去4-6小时内（今上午）的中国新能源车相关重要新闻。\n"
-            "重点关注品牌：AITO问界、理想、小鹏、小米、蔚来、比亚迪、极氪、智己等。\n"
-            "关注领域：智驾更新（NOA/城市NOA）、新车发布/上市、销量数据、KOL/媒体评测观点、政策动态。\n"
-            "搜索来源：36氪、虎嗅、汽车之家、懂车帝、各品牌官方微博/公众号。\n"
-            "请用中文整理，每条新闻包含：标题、来源、日期、简短摘要。\n"
-            "按板块分类：智驾动态、新车/产品、行业/政策、KOL观点。\n"
-            "每个板块2-4条新闻，总共8-12条。如果没有某板块的新闻就省略该板块。"
-        ),
-    },
-    "evening": {
-        "title": "特斯拉晚报",
-        "emoji": "🌙",
-        "prompt": (
-            "你是一个特斯拉新闻编辑。请搜索并整理今天白天（从早上到现在）的特斯拉相关重要新闻。\n"
-            "搜索来源包括：Electrek、Tesla官方、马斯克X(Twitter)动态、36氪、虎嗅等。\n"
-            "重点关注：FSD自动驾驶进展、特斯拉新车/产品动态、中国市场消息、股价重要变动、马斯克言论。\n"
-            "请用中文整理，每条新闻包含：标题、来源、日期、简短摘要。\n"
-            "按板块分类：FSD动态、产品/市场、中国动态、其他重要消息。\n"
-            "每个板块2-4条新闻，总共8-12条。如果没有某板块的新闻就省略该板块。"
-        ),
-    },
+    "morning": {"title": "特斯拉晨报", "emoji": "🚗"},
+    "noon": {"title": "新能源午报", "emoji": "⚡"},
+    "evening": {"title": "特斯拉晚报", "emoji": "🌙"},
 }
 
 # ============================================================
-# STEP 1: Fetch news via OpenAI (with web search)
+# RSS Sources
 # ============================================================
-def fetch_news(report_config):
-    print(f"[1/3] Fetching news for {report_config['title']}...")
-    client = OpenAI(api_key=OPENAI_API_KEY)
+TESLA_FEEDS = [
+    {"name": "Electrek", "url": "https://electrek.co/feed/", "lang": "en", "keywords": ["tesla", "model y", "model 3", "model s", "model x", "cybertruck", "fsd", "autopilot", "musk", "elon"]},
+    {"name": "TeslaRati", "url": "https://www.teslarati.com/feed/", "lang": "en", "keywords": ["tesla", "model y", "model 3", "fsd", "autopilot", "musk"]},
+    {"name": "36氪", "url": "https://36kr.com/feed", "lang": "zh", "keywords": ["特斯拉", "Tesla", "马斯克", "Musk", "FSD"]},
+    {"name": "InsideEVs", "url": "https://insideevs.com/rssfeeds/all.xml", "lang": "en", "keywords": ["tesla", "model y", "model 3", "fsd", "autopilot", "musk"]},
+]
 
-    response = client.chat.completions.create(
-        model="gpt-4o-mini",
-        messages=[
-            {
-                "role": "user",
-                "content": report_config["prompt"],
-            }
-        ],
-        tools=[
-            {
-                "type": "function",
-                "function": {
-                    "name": "web_search",
-                    "description": "Search the web for the latest news",
-                    "parameters": {
-                        "type": "object",
-                        "properties": {
-                            "query": {
-                                "type": "string",
-                                "description": "Search query",
-                            }
-                        },
-                        "required": ["query"],
-                    },
-                },
-            }
-        ],
-        tool_choice="auto",
-    )
+NEV_FEEDS = [
+    {"name": "36氪汽车", "url": "https://36kr.com/feed", "lang": "zh", "keywords": ["新能源汽车", "问界", "理想", "小鹏", "蔚来", "小米汽车", "比亚迪", "极氪", "智驾", "NOA", "智己", "特斯拉"]},
+    {"name": "IT之家", "url": "https://www.ithome.com/rss/", "lang": "zh", "keywords": ["汽车", "新能源", "问界", "理想", "小鹏", "蔚来", "小米", "比亚迪", "智驾", "特斯拉"]},
+    {"name": "InsideEVs", "url": "https://insideevs.com/rssfeeds/all.xml", "lang": "en", "keywords": ["BYD", "NIO", "XPeng", "Li Auto", "Xiaomi", "Aito"]},
+]
 
-    # Check if model wants to call web_search
-    message = response.choices[0].message
-    if message.tool_calls:
-        # Execute web searches
-        news_results = []
-        for tool_call in message.tool_calls:
-            args = json.loads(tool_call.function.arguments)
-            print(f"  Searching: {args['query']}")
 
-            search_response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "user", "content": args["query"]}
-                ],
-                tools=[{
-                    "type": "function",
-                    "function": {
-                        "name": "web_search",
-                        "description": "Search the web",
-                        "parameters": {
-                            "type": "object",
-                            "properties": {
-                                "query": {"type": "string", "description": "Search query"}
-                            },
-                            "required": ["query"],
-                        },
-                    }
-                }],
-                tool_choice={"type": "function", "function": {"name": "web_search"}},
-            )
+def clean_html(text):
+    """Remove HTML tags and clean up text."""
+    text = unescape(text)
+    text = re.sub(r'<[^>]+>', '', text)
+    text = re.sub(r'\s+', ' ', text).strip()
+    return text
 
-            search_message = search_response.choices[0].message
-            if search_message.tool_calls:
-                for sc in search_message.tool_calls:
-                    result = json.loads(sc.function.arguments)
-                    news_results.append(result.get("query", ""))
-                    print(f"  Found: {result.get('query', '')}")
 
-        # Now ask model to compile the news
-        compile_prompt = (
-            report_config["prompt"] + "\n\n"
-            "以下是我搜索到的相关关键词和来源，请根据这些信息整理新闻：\n"
-            + "\n".join(f"- {r}" for r in news_results) + "\n\n"
-            "请用以下JSON格式返回（不要包含markdown代码块）：\n"
-            '{"sections": [{"name": "板块名称", "news": [{"title": "标题", "source": "来源", "date": "M月D日", "summary": "摘要"}]}], "total": N}'
-        )
+def strip_text(text, max_len=300):
+    """Truncate text to max_len characters."""
+    if len(text) <= max_len:
+        return text
+    return text[:max_len].rsplit(' ', 1)[0] + "..."
 
-        compile_response = client.chat.completions.create(
-            model="gpt-4o-mini",
-            messages=[{"role": "user", "content": compile_prompt}],
-            temperature=0.3,
-        )
-        content = compile_response.choices[0].message.content.strip()
-    else:
-        content = message.content.strip()
 
-    # Parse JSON from response
+def time_ago(entry, hours=24):
+    """Check if entry was published within the given hours."""
     try:
-        # Remove markdown code blocks if present
-        clean = content
-        if clean.startswith("```"):
-            clean = clean.split("\n", 1)[1] if "\n" in clean else clean[3:]
-        if clean.endswith("```"):
-            clean = clean[:-3]
-        clean = clean.strip()
+        pub_time = entry.get("published_parsed") or entry.get("updated_parsed")
+        if not pub_time:
+            return True
+        dt = datetime(*pub_time[:6], tzinfo=timezone.utc)
+        now = datetime.now(timezone.utc)
+        return (now - dt).total_seconds() <= hours * 3600
+    except Exception:
+        return True
 
-        data = json.loads(clean)
-    except json.JSONDecodeError:
-        print(f"  Warning: Could not parse JSON, using raw content")
-        print(f"  Raw: {content[:200]}...")
-        data = {
-            "sections": [{"name": "新闻", "news": [{"title": "今日新闻汇总", "source": "AI", "date": datetime.now().strftime("%-m月%-d日"), "summary": content[:500]}]}],
-            "total": 1,
-        }
 
-    print(f"  Found {data.get('total', '?')} news items across {len(data.get('sections', []))} sections")
+def fetch_feed(feed_info, hours=24):
+    """Fetch and filter RSS feed entries."""
+    try:
+        d = feedparser.parse(feed_info["url"])
+        results = []
+        keywords = [k.lower() for k in feed_info["keywords"]]
+        lang = feed_info["lang"]
+
+        for entry in d.entries[:30]:
+            if not time_ago(entry, hours):
+                continue
+
+            title = clean_html(entry.get("title", ""))
+            summary = clean_html(entry.get("summary", "") or entry.get("description", ""))
+
+            if not title:
+                continue
+
+            # Keyword matching
+            title_lower = title.lower()
+            matched = any(kw in title_lower for kw in keywords)
+            if not matched and summary:
+                summary_lower = summary.lower()
+                matched = any(kw in summary_lower for kw in keywords)
+            if not matched:
+                continue
+
+            # Get date
+            date_str = ""
+            try:
+                pub = entry.get("published_parsed") or entry.get("updated_parsed")
+                if pub:
+                    dt_bj = datetime(*pub[:6], tzinfo=timezone.utc).astimezone(BEIJING)
+                    date_str = f"{dt_bj.month}月{dt_bj.day}日"
+            except Exception:
+                date_str = datetime.now(BEIJING).strftime("%-m月%-d日")
+
+            results.append({
+                "title": title,
+                "source": feed_info["name"],
+                "date": date_str,
+                "summary": strip_text(summary, 250) if summary else "",
+                "link": entry.get("link", ""),
+            })
+
+        return results
+    except Exception as e:
+        print(f"  Warning: Failed to fetch {feed_info['name']}: {e}")
+        return []
+
+
+def deduplicate(items):
+    """Remove duplicate news by similar title."""
+    seen = []
+    unique = []
+    for item in items:
+        title = item["title"].lower()[:40]
+        if not any(title in s for s in seen):
+            seen.append(title)
+            unique.append(item)
+    return unique
+
+
+def fetch_all_news(report_type):
+    """Fetch news from all relevant RSS feeds."""
+    if report_type in ("morning", "evening"):
+        feeds = TESLA_FEEDS
+        hours = 24 if report_type == "morning" else 12
+        label = "Tesla & EV News"
+    else:
+        feeds = NEV_FEEDS
+        hours = 6
+        label = "NEV News"
+
+    print(f"[1/3] Fetching {label} from RSS (last {hours}h)...")
+
+    all_items = []
+    for feed in feeds:
+        items = fetch_feed(feed, hours)
+        print(f"  {feed['name']}: {len(items)} items")
+        all_items.extend(items)
+
+    # Deduplicate and limit
+    all_items = deduplicate(all_items)
+    all_items = all_items[:15]
+
+    # Group by source for sections
+    if report_type in ("morning", "evening"):
+        en_items = [i for i in all_items if i["source"] in ("Electrek", "TeslaRati", "InsideEVs")]
+        zh_items = [i for i in all_items if i["source"] not in ("Electrek", "TeslaRati", "InsideEVs")]
+
+        sections = []
+        if en_items:
+            sections.append({"name": "🇺🇸 国际动态", "news": en_items[:8]})
+        if zh_items:
+            sections.append({"name": "🇨🇳 国内动态", "news": zh_items[:8]})
+    else:
+        sections = [{"name": "🚗 新能源汽车资讯", "news": all_items[:12]}]
+
+    data = {"sections": sections, "total": sum(len(s["news"]) for s in sections)}
+    print(f"  Total: {data['total']} items across {len(sections)} sections")
     return data
 
 
 # ============================================================
-# STEP 2: Format and push to Server Chan (WeChat)
+# Push to WeChat (Server Chan) - Markdown
 # ============================================================
 def push_to_wechat(data, report_config):
     print("[2/3] Pushing to WeChat via Server Chan...")
 
-    now = datetime.now()
+    now = datetime.now(BEIJING)
     md_lines = [
         f"# {report_config['emoji']} {report_config['title']}（{now.month}月{now.day}日）",
         "---",
@@ -191,34 +193,41 @@ def push_to_wechat(data, report_config):
         for i, item in enumerate(section.get("news", []), 1):
             md_lines.append(f"**{i}. {item['title']}**")
             md_lines.append(f"来源：{item['source']} · {item['date']}")
-            md_lines.append(f"> {item['summary']}")
+            if item.get("summary"):
+                md_lines.append(f"> {item['summary']}")
+            if item.get("link"):
+                md_lines.append(f"[阅读原文]({item['link']})")
             md_lines.append("")
         md_lines.append("---")
 
-    md_lines.append(f"> 📊 共{data.get('total', '?')}条 | AI自动采集翻译")
+    md_lines.append(f"> 📊 共{data.get('total', 0)}条 | RSS自动采集")
 
     markdown_content = "\n".join(md_lines)
 
-    resp = requests.post(
-        "https://sctapi.ftqq.com/SCT351050TfLhDDxCIsH2WUicG3fAelrR3.send",
-        json={"title": f"{report_config['emoji']} {report_config['title']}", "desp": markdown_content},
-        timeout=30,
-    )
-    result = resp.json()
-    if result.get("code") == 0:
-        print(f"  ✓ WeChat push SUCCESS")
+    if SCT_SENDKEY:
+        resp = requests.post(
+            f"https://sctapi.ftqq.com/{SCT_SENDKEY}.send",
+            json={"title": f"{report_config['emoji']} {report_config['title']}", "desp": markdown_content},
+            timeout=30,
+        )
+        result = resp.json()
+        if result.get("code") == 0:
+            print("  ✓ WeChat push SUCCESS")
+        else:
+            print(f"  ✗ WeChat push FAILED: {result}")
     else:
-        print(f"  ✗ WeChat push FAILED: {result}")
+        print("  ⊘ WeChat push SKIPPED (no SCT_SENDKEY)")
+
     return markdown_content
 
 
 # ============================================================
-# STEP 3: Format and push to Email (iCloud HTML)
+# Push to Email (iCloud) - HTML
 # ============================================================
 def push_to_email(data, report_config):
     print("[3/3] Pushing to Email via iCloud SMTP...")
 
-    now = datetime.now()
+    now = datetime.now(BEIJING)
     cards_html = ""
 
     for section in data.get("sections", []):
@@ -228,7 +237,7 @@ def push_to_email(data, report_config):
             <div style="padding:14px 16px;background:#f8f8f8;border-radius:8px;margin-bottom:10px;">
                 <div style="font-weight:bold;color:#333;font-size:15px;">{item["title"]}</div>
                 <div style="color:#999;font-size:12px;margin-top:4px;">{item["source"]} · {item["date"]}</div>
-                <div style="color:#555;font-size:14px;line-height:1.7;margin-top:6px;">{item["summary"]}</div>
+                <div style="color:#555;font-size:14px;line-height:1.7;margin-top:6px;">{item.get("summary", "")}</div>
             </div>"""
 
     html_body = f"""
@@ -240,25 +249,28 @@ def push_to_email(data, report_config):
         <div style="padding:24px 32px;">
             {cards_html}
             <div style="text-align:center;color:#ccc;font-size:12px;margin-top:20px;padding-top:16px;border-top:1px solid #eee;">
-                📊 共{data.get('total', '?')}条 · AI自动采集翻译
+                📊 共{data.get('total', 0)}条 · RSS自动采集
             </div>
         </div>
     </div>"""
 
-    msg = MIMEMultipart("alternative")
-    msg["Subject"] = f"{report_config['emoji']} {report_config['title']}（{now.month}月{now.day}日）"
-    msg["From"] = ICLOUD_USER
-    msg["To"] = ICLOUD_USER
-    msg.attach(MIMEText(html_body, "html", "utf-8"))
+    if ICLOUD_USER and ICLOUD_PASS:
+        msg = MIMEMultipart("alternative")
+        msg["Subject"] = f"{report_config['emoji']} {report_config['title']}（{now.month}月{now.day}日）"
+        msg["From"] = ICLOUD_USER
+        msg["To"] = ICLOUD_USER
+        msg.attach(MIMEText(html_body, "html", "utf-8"))
 
-    try:
-        with smtplib.SMTP("smtp.mail.me.com", 587) as server:
-            server.starttls()
-            server.login(ICLOUD_USER, ICLOUD_PASS)
-            server.sendmail(ICLOUD_USER, ICLOUD_USER, msg.as_string())
-        print("  ✓ Email push SUCCESS")
-    except Exception as e:
-        print(f"  ✗ Email push FAILED: {e}")
+        try:
+            with smtplib.SMTP("smtp.mail.me.com", 587) as server:
+                server.starttls()
+                server.login(ICLOUD_USER, ICLOUD_PASS)
+                server.sendmail(ICLOUD_USER, ICLOUD_USER, msg.as_string())
+            print("  ✓ Email push SUCCESS")
+        except Exception as e:
+            print(f"  ✗ Email push FAILED: {e}")
+    else:
+        print("  ⊘ Email push SKIPPED (no ICLOUD creds)")
 
     return html_body
 
@@ -268,19 +280,19 @@ def push_to_email(data, report_config):
 # ============================================================
 def main():
     print(f"\n{'='*50}")
-    print(f"  {REPORTS[REPORT_TYPE]['title']} - Cloud Push Bot")
-    print(f"  {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
+    print(f"  {REPORTS[REPORT_TYPE]['title']} - Cloud RSS Bot")
+    print(f"  {datetime.now(BEIJING).strftime('%Y-%m-%d %H:%M:%S')} (Beijing)")
     print(f"{'='*50}\n")
 
     report_config = REPORTS[REPORT_TYPE]
 
-    # Step 1: Fetch news
-    data = fetch_news(report_config)
+    data = fetch_all_news(REPORT_TYPE)
 
-    # Step 2: Push to WeChat
+    if data["total"] == 0:
+        print("No news found. Skipping push.")
+        return
+
     push_to_wechat(data, report_config)
-
-    # Step 3: Push to Email
     push_to_email(data, report_config)
 
     print(f"\n{'='*50}")
