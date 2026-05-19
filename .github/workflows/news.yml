@@ -2,10 +2,9 @@ name: Tesla News Bot
 
 on:
   schedule:
-  - cron: '0 0 * * *'    # 08:00 北京
-- cron: '0 4 * * *'    # 12:00 北京  
-- cron: '30 9 * * *'   # 17:30 北京
-
+    - cron: '0 0 * * *'    # 08:00 北京 - 晨报
+    - cron: '0 4 * * *'    # 12:00 北京 - 午报
+    - cron: '30 9 * * *'   # 17:30 北京 - 晚报
   workflow_dispatch:
     inputs:
       report_type:
@@ -38,7 +37,7 @@ jobs:
             echo "type=${{ inputs.report_type }}" >> $GITHUB_OUTPUT
           else
             HOUR=$(date -u +%H)
-            if [ "$HOUR" = "01" ]; then
+            if [ "$HOUR" = "00" ]; then
               echo "type=morning" >> $GITHUB_OUTPUT
             elif [ "$HOUR" = "04" ]; then
               echo "type=noon" >> $GITHUB_OUTPUT
