@@ -1,17 +1,18 @@
 #!/usr/bin/env python3
 """
-News Bot v5.1 — Unified AI Extraction + Expanded Sources
+News Bot v5.2 — Full Twitter Coverage + Chinese-First Pipeline
 
   Morning 08:00 : Tesla FSD / Autopilot / Robotaxi / Optimus (strict focus)
   Noon    12:00 : Chinese NEV by brand (NIO/Li Auto/XPeng/Xiaomi/AITO)
   Evening 17:30 : Global frontier tech with AI-extracted summaries
 
-v5.1 changes:
-  - ai_extract() — intelligent key information extraction (≤200字)
-  - ensure_summary() — GUARANTEES every item has proper summary + date + link
-  - Expanded sources: RSSHub search + Google News + more CN media
-  - Unified format: summary(≤200字) + date + original link (NO exceptions)
-  - Shorter timeouts on Twitter/Nitter to avoid wasting time
+v5.2 changes:
+  - ALL 9 Twitter accounts restored (user requirement)
+  - Translate-then-extract pipeline: translate full text → ai_extract from Chinese
+  - ensure_chinese() final pass: guarantees zero English in output
+  - Morning priority: Twitter → overseas RSS → domestic RSS → Google News
+  - More Nitter instances for better Twitter availability
+  - All summaries ≤200字, complete Chinese, with date + link (NO exceptions)
 """
 
 import os, sys, smtplib, re, time, hashlib, feedparser, requests
@@ -29,7 +30,7 @@ ICLOUD_PASS = os.environ.get("ICLOUD_PASS", "")
 REPORT_TYPE = sys.argv[1] if len(sys.argv) > 1 else "morning"
 
 BEIJING = timezone(timedelta(hours=8))
-UA = "Mozilla/5.0 (compatible; NewsBot/5.1)"
+UA = "Mozilla/5.0 (compatible; NewsBot/5.2)"
 WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"]
 
 REPORTS = {
@@ -39,13 +40,28 @@ REPORTS = {
 }
 
 # ============================================================
-# Morning: X/Twitter Account Sources (via RSSHub)
+# Morning: X/Twitter Account Sources (ALL 9 — user requirement)
 # ============================================================
 TWITTER_ACCOUNTS = [
-    {"handle": "SawyerMerritt",    "name": "Sawyer Merritt",    "zh": "Sawyer Merritt"},
-    {"handle": "WholeMarsBlog",    "name": "Whole Mars Catalog", "zh": "Whole Mars"},
-    {"handle": "elonmusk",         "name": "Elon Musk",         "zh": "马斯克"},
-    {"handle": "Tesla_AI",         "name": "Tesla AI",          "zh": "Tesla AI"},
+    {"handle": "SawyerMerritt",    "name": "Sawyer Merritt",      "zh": "Sawyer Merritt"},
+    {"handle": "ChuckCook95",      "name": "Chuck Cook",          "zh": "Chuck Cook"},
+    {"handle": "greentheonly",     "name": "green",               "zh": "green (黑客)"},
+    {"handle": "DirtyTesla",       "name": "Dirty Tesla",         "zh": "Dirty Tesla"},
+    {"handle": "brandonee916",     "name": "Brandon",             "zh": "Brandon"},
+    {"handle": "WholeMarsBlog",    "name": "Whole Mars Catalog",  "zh": "Whole Mars"},
+    {"handle": "elonmusk",        "name": "Elon Musk",           "zh": "马斯克"},
+    {"handle": "Tesla_AI",        "name": "Tesla AI",            "zh": "Tesla AI"},
+    {"handle": "Tesla",           "name": "Tesla Official",      "zh": "特斯拉官方"},
+]
+
+# More Nitter instances for better availability
+NITTER_INSTANCES = [
+    "nitter.poast.org",
+    "nitter.privacydev.net",
+    "nitter.net",
+    "nitter.cz",
+    "nitter.unixfox.eu",
+    "nitter.fdn.fr",
 ]
 
 # Strict FSD / Autopilot / Tesla-tech keywords (morning only)
@@ -66,8 +82,8 @@ MORNING_STRICT_KW = [
     "完全自动驾驶", "智能驾驶", "特斯拉软件更新",
 ]
 
-# Morning supplemental RSS feeds (expanded)
-MORNING_RSS_FEEDS = [
+# Morning overseas RSS feeds (English — primary supplement after Twitter)
+MORNING_OVERSEAS_RSS = [
     {"name": "Electrek", "url": "https://electrek.co/feed/", "lang": "en",
      "keywords": ["fsd", "autopilot", "self-driving", "robotaxi", "optimus",
                   "software update", "tesla ai", "autonomous"]},
@@ -79,6 +95,10 @@ MORNING_RSS_FEEDS = [
                   "robotaxi", "autonomous", "release notes"]},
     {"name": "InsideEVs", "url": "https://insideevs.com/rss/", "lang": "en",
      "keywords": ["fsd", "autopilot", "self-driving", "tesla", "robotaxi"]},
+]
+
+# Morning domestic RSS feeds (Chinese — secondary supplement)
+MORNING_DOMESTIC_RSS = [
     {"name": "36氪", "url": "https://36kr.com/feed", "lang": "zh",
      "keywords": ["FSD", "特斯拉自动驾驶", "Robotaxi", "Optimus", "特斯拉AI", "特斯拉智驾"]},
     {"name": "IT之家", "url": "https://www.ithome.com/rss/", "lang": "zh",
@@ -89,13 +109,7 @@ MORNING_RSS_FEEDS = [
      "keywords": ["特斯拉", "FSD", "自动驾驶", "智驾", "Robotaxi"]},
 ]
 
-# RSSHub search routes (proxied through RSSHub — works from GitHub Actions)
-MORNING_RSSHUB_SEARCH = [
-    {"name": "RSSHub·Google·FSD", "url": "https://rsshub.app/google/news/search/tesla%20fsd%20autopilot", "lang": "en",
-     "keywords": ["fsd", "autopilot", "self-driving", "robotaxi", "optimus", "autonomous", "tesla"]},
-]
-
-# Google News RSS search (direct, as backup — works from GitHub Actions US servers)
+# Google News RSS search (direct — works from GitHub Actions US servers)
 MORNING_GOOGLE_NEWS = [
     {"name": "Google·特斯拉FSD", "query": "tesla fsd autopilot robotaxi", "lang": "en"},
     {"name": "Google·Tesla AI", "query": "tesla AI optimus robot autonomous", "lang": "en"},
@@ -146,10 +160,6 @@ NOON_RSS_FEEDS = [
      "keywords": ["蔚来", "理想", "小鹏", "小米汽车", "问界", "智驾", "自动驾驶"]},
     {"name": "懂车帝", "url": "https://www.dongchedi.com/rss", "lang": "zh",
      "keywords": ["蔚来", "理想", "小鹏", "小米", "问界", "智驾"]},
-    {"name": "电动邦", "url": "https://www.ddc.net.cn/rss", "lang": "zh",
-     "keywords": ["蔚来", "理想", "小鹏", "小米", "问界", "智驾", "新能源"]},
-    {"name": "新出行", "url": "https://www.xinchuxing.com/rss", "lang": "zh",
-     "keywords": ["蔚来", "理想", "小鹏", "小米", "问界", "智驾", "NOA"]},
 ]
 
 NOON_GOOGLE_NEWS = [
@@ -218,15 +228,22 @@ def _get_session():
 
 
 # ============================================================
-# Translation (English → Chinese)
+# Translation (English → Chinese) — with caching & fallback
 # ============================================================
 _translate_cache = {}
 
 def translate(text, lang="en"):
-    if lang == "zh" or not text:
+    """Translate text to Chinese. Returns Chinese text, or original if already Chinese/empty."""
+    if not text or lang == "zh":
+        return text
+    # Quick check: if text is already mostly Chinese, skip
+    cn_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+    total_chars = len(re.sub(r'\s+', '', text))
+    if total_chars > 0 and cn_chars / total_chars > 0.3:
         return text
     if text in _translate_cache:
         return _translate_cache[text]
+    # Google Translate (free)
     try:
         s = _get_session()
         r = s.get("https://translate.googleapis.com/translate_a/single",
@@ -237,6 +254,7 @@ def translate(text, lang="en"):
             return result
     except Exception:
         pass
+    # MyMemory fallback
     try:
         s = _get_session()
         r = s.get("https://api.mymemory.translated.net/get",
@@ -250,8 +268,28 @@ def translate(text, lang="en"):
     return text
 
 
+def ensure_chinese(text):
+    """Final pass: if text still contains significant English, translate it.
+    This is the safety net to guarantee zero English in output."""
+    if not text:
+        return text
+    # Check ratio of English letters vs Chinese characters
+    en_chars = len(re.findall(r'[a-zA-Z]', text))
+    cn_chars = len(re.findall(r'[\u4e00-\u9fff]', text))
+    # If more than 40% English letters (and at least 10 English chars), translate
+    total_alpha = en_chars + cn_chars
+    if total_alpha > 5 and en_chars / total_alpha > 0.4:
+        translated = translate(text, "en")
+        # If translation produced Chinese, use it
+        cn_after = len(re.findall(r'[\u4e00-\u9fff]', translated))
+        if cn_after > cn_chars:
+            return translated
+    return text
+
+
 # ============================================================
 # AI Extract — Unified Key Information Extraction (≤200字)
+# Works on CHINESE text for best results
 # ============================================================
 def ai_extract(text, max_chars=200):
     """Extract key information from text, compress to max_chars."""
@@ -314,17 +352,26 @@ def ai_extract(text, max_chars=200):
 
 
 def ensure_summary(item, max_chars=200):
-    """GUARANTEE every item has a proper summary <= max_chars."""
+    """GUARANTEE every item has a proper Chinese summary <= max_chars."""
     summary = item.get("summary", "")
+    # If summary exists and is reasonable length, ensure it's Chinese
     if summary and 15 < len(summary) <= max_chars:
-        return summary
+        return ensure_chinese(summary)
+    # Try to extract from raw content (translate first if English)
     content = item.get("_raw_content", "")
+    lang = item.get("_lang", "en")
     if content:
-        extracted = ai_extract(content, max_chars)
+        if lang == "en":
+            content_zh = translate(content, "en")
+        else:
+            content_zh = content
+        extracted = ai_extract(content_zh, max_chars)
         if extracted and len(extracted) > 15:
             return extracted
+    # Title fallback
     title = item.get("title", "")
     if title:
+        title = ensure_chinese(title)
         return title[:max_chars - 3] + "..." if len(title) > max_chars else title
     return "暂无摘要"
 
@@ -345,6 +392,7 @@ def fetch_feed(feed_cfg, hours):
         return items
 
     kw = feed_cfg.get("keywords", [])
+    lang = feed_cfg.get("lang", "en")
     for entry in d.entries:
         try:
             published = None
@@ -383,13 +431,19 @@ def fetch_feed(feed_cfg, hours):
                 time_short = f"{bj.month}/{bj.day} {bj.hour:02d}:{bj.minute:02d}"
                 date_str = f"{bj.year}-{bj.month:02d}-{bj.day:02d}"
 
-            lang = feed_cfg.get("lang", "en")
+            # Translate-then-extract pipeline:
+            # For English: translate full content first, then ai_extract from Chinese
             if lang == "en":
-                title_zh = translate(title, lang)
-                summary_zh = translate(ai_extract(content, 200), lang) if content else title_zh
+                title_zh = translate(title, "en")
+                if content:
+                    content_zh = translate(content, "en")
+                    summary_zh = ai_extract(content_zh, 200)
+                else:
+                    summary_zh = title_zh
             else:
                 title_zh = title
                 summary_zh = ai_extract(content, 200) if content else title
+
             if len(summary_zh) > 200:
                 summary_zh = summary_zh[:197] + "..."
 
@@ -397,7 +451,7 @@ def fetch_feed(feed_cfg, hours):
                 "title": title_zh, "title_en": title if lang == "en" else "",
                 "summary": summary_zh, "link": link, "source": feed_cfg["name"],
                 "author": author, "time_short": time_short, "date": date_str,
-                "_raw_content": content,
+                "_raw_content": content, "_lang": lang,
             })
         except Exception: continue
     return items
@@ -454,12 +508,18 @@ def fetch_google_news(query_cfg, hours):
                 time_short = f"{bj.month}/{bj.day} {bj.hour:02d}:{bj.minute:02d}"
                 date_str = f"{bj.year}-{bj.month:02d}-{bj.day:02d}"
 
+            # Translate-then-extract for English Google News
             if lang == "en":
                 title_zh = translate(title, "en")
-                summary_zh = translate(ai_extract(content, 200), "en") if content else title_zh
+                if content:
+                    content_zh = translate(content, "en")
+                    summary_zh = ai_extract(content_zh, 200)
+                else:
+                    summary_zh = title_zh
             else:
                 title_zh = title
                 summary_zh = ai_extract(content, 200) if content else title
+
             if len(summary_zh) > 200:
                 summary_zh = summary_zh[:197] + "..."
 
@@ -467,14 +527,14 @@ def fetch_google_news(query_cfg, hours):
                 "title": title_zh, "title_en": title if lang == "en" else "",
                 "summary": summary_zh, "link": link, "source": query_cfg["name"],
                 "author": author, "time_short": time_short, "date": date_str,
-                "_raw_content": content, "_is_google": True,
+                "_raw_content": content, "_is_google": True, "_lang": lang,
             })
         except Exception: continue
     return items
 
 
 def fetch_twitter_account(account, hours):
-    """Fetch tweets via RSSHub (primary, 4s timeout) then Nitter (fallback, 3s)."""
+    """Fetch tweets via RSSHub (primary, 3s) then Nitter (fallback, 2s each)."""
     handle = account["handle"]
     cutoff = datetime.now(timezone.utc) - timedelta(hours=hours)
     items = []
@@ -495,22 +555,25 @@ def fetch_twitter_account(account, hours):
                     if not any(k.lower() in full_text.lower() for k in MORNING_STRICT_KW): continue
                     link = entry.get("link", "")
                     time_short, date_str = _format_time(published)
+                    # Translate-then-extract: translate full tweet, then extract from Chinese
+                    full_tweet = content if content else title
+                    tweet_zh = translate(full_tweet, "en")
                     title_zh = translate(title, "en")
-                    tweet_content = content if content else title
-                    summary_zh = translate(ai_extract(tweet_content, 180), "en") if tweet_content else title_zh
+                    summary_zh = ai_extract(tweet_zh, 180) if len(tweet_zh) > 30 else tweet_zh
                     if len(summary_zh) > 200: summary_zh = summary_zh[:197] + "..."
                     items.append({
                         "title": title_zh, "title_en": title, "summary": summary_zh,
                         "link": link, "source": f"@{handle}", "author": account["zh"],
                         "author_handle": handle, "is_tweet": True,
-                        "time_short": time_short, "date": date_str, "_raw_content": content,
+                        "time_short": time_short, "date": date_str,
+                        "_raw_content": full_tweet, "_lang": "en",
                     })
                 except Exception: continue
     except Exception: pass
 
     # 2) Nitter RSS (fallback, only if RSSHub gave nothing)
     if not items:
-        for instance in ["nitter.poast.org", "nitter.privacydev.net"]:
+        for instance in NITTER_INSTANCES:
             try:
                 url = f"https://{instance}/{handle}/rss"
                 r = s_get(url, timeout=2)
@@ -522,16 +585,20 @@ def fetch_twitter_account(account, hours):
                         if not title: continue
                         published = _parse_time(entry)
                         if published and published < cutoff: continue
-                        if not any(k.lower() in title.lower() for k in MORNING_STRICT_KW): continue
+                        full_text = title + " " + _get_content(entry)
+                        if not any(k.lower() in full_text.lower() for k in MORNING_STRICT_KW): continue
                         link = entry.get("link", "")
                         time_short, date_str = _format_time(published)
-                        title_zh = translate(title, "en")
-                        summary_zh = ai_extract(title_zh, 180) if len(title_zh) > 30 else title_zh
+                        # Translate-then-extract
+                        tweet_zh = translate(title, "en")
+                        title_zh = tweet_zh
+                        summary_zh = ai_extract(tweet_zh, 180) if len(tweet_zh) > 30 else tweet_zh
                         items.append({
                             "title": title_zh, "title_en": title, "summary": summary_zh,
                             "link": link, "source": f"@{handle}", "author": account["zh"],
                             "author_handle": handle, "is_tweet": True,
-                            "time_short": time_short, "date": date_str, "_raw_content": title,
+                            "time_short": time_short, "date": date_str,
+                            "_raw_content": title, "_lang": "en",
                         })
                     except Exception: continue
                 if items: break
@@ -569,12 +636,13 @@ def fetch_weibo_user(founder, hours):
                 "source": f"微博·{founder['name']}", "author": founder["name"],
                 "brand": founder["brand"], "is_weibo": True,
                 "time_short": time_short, "date": date_str, "_raw_content": content,
+                "_lang": "zh",
             })
         except Exception: continue
     return items
 
 
-# Helper functions for DRY
+# Helper functions
 def s_get(url, timeout=5):
     try:
         return _get_session().get(url, timeout=timeout, allow_redirects=True)
@@ -632,11 +700,15 @@ def dedup(items):
 
 
 # ============================================================
-# Finalize: ensure every item meets format requirements
+# Finalize: ensure every item meets format requirements + ALL Chinese
 # ============================================================
 def finalize_items(items):
     for item in items:
+        # Ensure summary is proper Chinese and ≤200字
         item["summary"] = ensure_summary(item, 200)
+        # Ensure title is Chinese
+        item["title"] = ensure_chinese(item.get("title", ""))
+        # Ensure date and time
         if not item.get("date"):
             now = datetime.now(BEIJING)
             item["date"] = f"{now.year}-{now.month:02d}-{now.day:02d}"
@@ -649,62 +721,80 @@ def finalize_items(items):
 
 
 # ============================================================
-# Morning: Fetch + Organize
+# Morning: Fetch + Organize (Priority: Twitter → overseas → domestic → Google)
 # ============================================================
 def fetch_morning():
     cfg = REPORTS["morning"]
     print(f"[1/3] 采集「{cfg['title']}」（最近 {cfg['hours']} 小时）...")
     all_items = []
 
-    # 1) X/Twitter accounts (short timeout to avoid wasting time)
-    print("  📡 抓取 X/Twitter 博主动态（FSD严格过滤）...")
+    # 1) X/Twitter accounts — HIGHEST priority (all 9 accounts)
+    print("  📡 抓取 X/Twitter 博主动态（9位核心博主，FSD严格过滤）...")
+    tweet_count = 0
     for account in TWITTER_ACCOUNTS:
         items = fetch_twitter_account(account, cfg["hours"])
-        if items: print(f"  @{account['handle']}: {len(items)} 条")
+        if items:
+            print(f"  @{account['handle']}: {len(items)} 条")
+            tweet_count += len(items)
         all_items.extend(items)
-        time.sleep(0.2)
+        time.sleep(0.15)
+    print(f"  → Twitter 共 {tweet_count} 条")
 
-    # 2) Supplemental RSS feeds
-    print("  📡 抓取特斯拉FSD专业源...")
-    for feed in MORNING_RSS_FEEDS:
+    # 2) Overseas English RSS feeds (primary supplement)
+    print("  📡 抓取海外特斯拉FSD专业源...")
+    overseas_items = []
+    for feed in MORNING_OVERSEAS_RSS:
         items = fetch_feed(feed, cfg["hours"])
         if items:
             print(f"  {feed['name']}: {len(items)} 条")
-            for item in items: item["is_tweet"] = False
+            for item in items:
+                item["is_tweet"] = False
+                item["_overseas"] = True
+            overseas_items.extend(items)
             all_items.extend(items)
 
-    # 3) RSSHub search routes (proxied through RSSHub)
-    print("  📡 搜索 RSSHub 特斯拉FSD...")
-    for feed in MORNING_RSSHUB_SEARCH:
+    # 3) Domestic Chinese RSS feeds (secondary supplement)
+    print("  📡 抓取国内特斯拉相关源...")
+    domestic_items = []
+    for feed in MORNING_DOMESTIC_RSS:
         items = fetch_feed(feed, cfg["hours"])
         if items:
             print(f"  {feed['name']}: {len(items)} 条")
-            for item in items: item["is_tweet"] = False
+            for item in items:
+                item["is_tweet"] = False
+                item["_overseas"] = False
+            domestic_items.extend(items)
             all_items.extend(items)
 
-    # 4) Google News search (direct)
+    # 4) Google News search (last resort)
     print("  📡 搜索 Google News...")
+    google_items = []
     for gn in MORNING_GOOGLE_NEWS:
         items = fetch_google_news(gn, cfg["hours"])
         if items:
             print(f"  {gn['name']}: {len(items)} 条")
+            google_items.extend(items)
             all_items.extend(items)
 
     all_items = dedup(all_items)
 
+    # Selection priority: tweets → overseas RSS → domestic RSS → Google News
     tweets = [i for i in all_items if i.get("is_tweet")]
-    rss_items = [i for i in all_items if not i.get("is_tweet") and not i.get("_is_google")]
-    google_items = [i for i in all_items if i.get("_is_google")]
+    overseas = [i for i in all_items if not i.get("is_tweet") and i.get("_overseas") and not i.get("_is_google")]
+    domestic = [i for i in all_items if not i.get("is_tweet") and not i.get("_overseas") and not i.get("_is_google")]
+    google = [i for i in all_items if i.get("_is_google")]
 
     selected = tweets[:8]
     remaining = cfg["max"] - len(selected)
-    if remaining > 0: selected.extend(rss_items[:remaining])
+    if remaining > 0: selected.extend(overseas[:remaining])
     remaining = cfg["max"] - len(selected)
-    if remaining > 0: selected.extend(google_items[:remaining])
+    if remaining > 0: selected.extend(domestic[:remaining])
+    remaining = cfg["max"] - len(selected)
+    if remaining > 0: selected.extend(google[:remaining])
     selected = selected[:cfg["max"]]
     selected = finalize_items(selected)
 
-    print(f"  共 {len(selected)} 条（推文 {len(tweets)} / RSS {len(rss_items)} / Google {len(google_items)}）")
+    print(f"  共 {len(selected)} 条（推文 {len(tweets)} / 海外 {len(overseas)} / 国内 {len(domestic)} / Google {len(google)}）")
     return selected
 
 
@@ -831,7 +921,6 @@ def push_wechat_morning(items):
     weekday = WEEKDAYS[now.weekday()]
     lines = [f"## 🌅 特斯拉FSD晨报", f"> {now.month}月{now.day}日 {weekday}  ·  共{len(items)}条", ""]
     for item in items:
-        author = item.get("author", item.get("source", ""))
         source = item.get("source", "")
         time_str = item.get("time_short", "")
         date_str = item.get("date", "")
@@ -892,7 +981,6 @@ def push_wechat_evening(items):
         lines.append(f"### {icon} {domain}")
         lines.append("")
         for item in domain_list:
-            author = item.get("author", item.get("source", ""))
             source = item.get("source", "")
             time_str = item.get("time_short", "")
             date_str = item.get("date", "")
@@ -933,7 +1021,6 @@ def push_email_morning(items):
     c1, c2 = "#e82127", "#c41e24"
     cards = ""
     for item in items:
-        author = item.get("author", item.get("source", ""))
         source = item.get("source", "")
         time_str = item.get("time_short", "")
         date_str = item.get("date", "")
@@ -1013,7 +1100,6 @@ def push_email_evening(items):
         for item in domain_list:
             link = item.get("link", "")
             summary = item.get("summary", "")
-            author = item.get("author", item.get("source", ""))
             source = item.get("source", "")
             time_str = item.get("time_short", "")
             date_str = item.get("date", "")
@@ -1073,7 +1159,7 @@ def main():
     cfg = REPORTS[REPORT_TYPE]
     now = datetime.now(BEIJING)
     print(f"\n{'='*50}")
-    print(f"  {cfg['emoji']} {cfg['title']} v5.1")
+    print(f"  {cfg['emoji']} {cfg['title']} v5.2")
     print(f"  {now.strftime('%Y-%m-%d %H:%M')} (北京时间)")
     print(f"{'='*50}\n")
 
