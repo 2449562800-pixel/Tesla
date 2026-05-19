@@ -2,9 +2,10 @@ name: Tesla News Bot
 
 on:
   schedule:
-    - cron: '0 1 * * *'
-    - cron: '0 4 * * *'
-    - cron: '0 10 * * *'
+  - cron: '0 0 * * *'    # 08:00 北京
+- cron: '0 4 * * *'    # 12:00 北京  
+- cron: '30 9 * * *'   # 17:30 北京
+
   workflow_dispatch:
     inputs:
       report_type:
