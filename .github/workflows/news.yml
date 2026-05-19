@@ -47,7 +47,6 @@ jobs:
           fi
       - name: Run news bot
         env:
-          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
           SCT_SENDKEY: ${{ secrets.SCT_SENDKEY }}
           ICLOUD_USER: ${{ secrets.ICLOUD_USER }}
           ICLOUD_PASS: ${{ secrets.ICLOUD_PASS }}
