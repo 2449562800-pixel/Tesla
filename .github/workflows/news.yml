@@ -1,0 +1,54 @@
+name: Tesla News Bot
+
+on:
+  schedule:
+    - cron: '0 1 * * *'
+    - cron: '0 4 * * *'
+    - cron: '0 10 * * *'
+  workflow_dispatch:
+    inputs:
+      report_type:
+        description: 'morning / noon / evening'
+        required: true
+        default: 'morning'
+        type: choice
+        options:
+          - morning
+          - noon
+          - evening
+
+jobs:
+  push-news:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+      - name: Determine report type
+        id: report
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "type=${{ inputs.report_type }}" >> $GITHUB_OUTPUT
+          else
+            HOUR=$(date -u +%H)
+            if [ "$HOUR" = "01" ]; then
+              echo "type=morning" >> $GITHUB_OUTPUT
+            elif [ "$HOUR" = "04" ]; then
+              echo "type=noon" >> $GITHUB_OUTPUT
+            else
+              echo "type=evening" >> $GITHUB_OUTPUT
+            fi
+          fi
+      - name: Run news bot
+        env:
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          SCT_SENDKEY: ${{ secrets.SCT_SENDKEY }}
+          ICLOUD_USER: ${{ secrets.ICLOUD_USER }}
+          ICLOUD_PASS: ${{ secrets.ICLOUD_PASS }}
+        run: python news_bot.py ${{ steps.report.outputs.type }}
