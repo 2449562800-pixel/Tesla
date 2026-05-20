@@ -121,20 +121,37 @@ MORNING_GOOGLE_NEWS = [
 # ============================================================
 NOON_BRANDS = [
     {"name": "蔚来", "en": "NIO", "founder": "李斌",
-     "keywords": ["蔚来", "NIO", "李斌", "ET5", "ET7", "ES6", "ES8", "EC6",
-                  "NOP+", "蔚来自动驾驶", "换电", "蔚来智驾", "蔚来ET"]},
+     "keywords": ["蔚来", "NIO", "李斌", "ET5", "ET7", "ET9", "ES6", "ES8", "EC6", "EC7",
+                  "NOP+", "NOP", "蔚来自动驾驶", "换电", "蔚来智驾", "蔚来ET",
+                  "神玑芯片", "天枢", "SkyOS", "蔚来价格", "蔚来降价", "蔚来涨价",
+                  "蔚来交付", "蔚来销量"]},
     {"name": "理想", "en": "Li Auto", "founder": "李想",
-     "keywords": ["理想", "Li Auto", "李想", "L6", "L7", "L8", "L9", "MEGA",
-                  "理想智驾", "AD Max", "AD Pro", "理想NOA", "端到端", "理想L"]},
+     "keywords": ["理想", "Li Auto", "李想", "L6", "L7", "L8", "L9", "MEGA", "i8",
+                  "理想智驾", "AD Max", "AD Pro", "理想NOA", "端到端", "理想L",
+                  "理想价格", "理想降价", "理想交付", "理想销量", "理想VLM"]},
     {"name": "小鹏", "en": "XPeng", "founder": "何小鹏",
-     "keywords": ["小鹏", "XPeng", "何小鹏", "G6", "G9", "P7", "X9", "MONA",
-                  "XNGP", "小鹏智驾", "小鹏自动驾驶", "天玑"]},
+     "keywords": ["小鹏", "XPeng", "何小鹏", "G6", "G7", "G9", "P7", "P7+", "X9", "MONA",
+                  "XNGP", "小鹏智驾", "小鹏自动驾驶", "天玑", "小鹏AI",
+                  "小鹏价格", "小鹏降价", "小鹏交付", "小鹏销量", "图灵芯片"]},
     {"name": "小米", "en": "Xiaomi", "founder": "雷军",
-     "keywords": ["小米汽车", "小米SU7", "雷军", "小米智驾", "小米自动驾驶",
-                  "SU7", "Xiaomi Auto", "澎湃智驾"]},
+     "keywords": ["小米汽车", "小米SU7", "小米YU7", "雷军", "小米智驾", "小米自动驾驶",
+                  "SU7", "YU7", "Xiaomi Auto", "澎湃智驾",
+                  "小米汽车价格", "小米降价", "小米交付", "小米销量"]},
     {"name": "问界", "en": "AITO", "founder": "余承东",
      "keywords": ["问界", "AITO", "余承东", "M5", "M7", "M8", "M9",
-                  "华为智驾", "鸿蒙智行", "ADS", "乾崑智驾"]},
+                  "华为智驾", "鸿蒙智行", "ADS", "乾崑智驾",
+                  "问界价格", "问界降价", "问界交付", "问界销量", "华为ADS"]},
+    {"name": "极氪", "en": "Zeekr", "founder": "安聪慧",
+     "keywords": ["极氪", "Zeekr", "安聪慧", "001", "007", "009", "7X", "MIX",
+                  "极氪智驾", "极氪自动驾驶", "极氪NZP", "浩瀚智驾",
+                  "极氪价格", "极氪降价", "极氪交付", "极氪销量"]},
+    {"name": "文远知行", "en": "WeRide", "founder": "韩旭",
+     "keywords": ["文远知行", "WeRide", "韩旭", "文远", "Robotaxi",
+                  "文远智驾", "文远自动驾驶", "文远Robotaxi",
+                  "WeRide robotaxi", "weride autonomous"]},
+    {"name": "HSD", "en": "HSD", "founder": "",
+     "keywords": ["HSD", "HSD智驾", "HSD自动驾驶", "HSD智驾系统",
+                  "HSD自动驾驶系统", "HSD智能驾驶"]},
 ]
 
 WEIBO_FOUNDERS = [
@@ -143,47 +160,60 @@ WEIBO_FOUNDERS = [
     {"uid": "1704116900", "name": "雷军",  "brand": "小米"},
     {"uid": "1650987740", "name": "李斌",  "brand": "蔚来"},
     {"uid": "1708388644", "name": "余承东", "brand": "问界"},
+    {"uid": "7409202712", "name": "安聪慧", "brand": "极氪"},
 ]
 
 NOON_RSS_FEEDS = [
     {"name": "CnEVPost", "url": "https://cnevpost.com/feed/", "lang": "en",
      "keywords": ["nio", "li auto", "xpeng", "xiaomi", "aito", "huawei",
-                  "zeekr", "byd", "nio", "ev", "battery swap", "autonomous",
-                  "ads", "ngp", "nop", "intelligent", "smart"]},
+                  "zeekr", "byd", "ev", "battery swap", "autonomous",
+                  "ads", "ngp", "nop", "intelligent", "smart", "weride",
+                  "robotaxi", "self-driving", "price cut", "delivery",
+                  "hsd", "zeekr"]},
     {"name": "36氪汽车", "url": "https://36kr.com/feed", "lang": "zh",
      "keywords": ["蔚来", "理想", "小鹏", "小米汽车", "问界", "NIO", "XPeng",
                   "Li Auto", "Xiaomi Auto", "AITO", "华为智驾", "智驾", "NOA",
-                  "自动驾驶", "新能源车", "电动车", "新能源"]},
+                  "自动驾驶", "新能源车", "电动车", "新能源", "极氪", "Zeekr",
+                  "文远知行", "WeRide", "HSD", "降价", "涨价", "交付", "销量",
+                  "价格", "新车", "上市"]},
     {"name": "IT之家汽车", "url": "https://www.ithome.com/rss/", "lang": "zh",
      "keywords": ["蔚来", "理想", "小鹏", "小米汽车", "问界", "华为智驾",
                   "智驾", "NOA", "自动驾驶", "新能源", "电动车", "SU7",
-                  "蔚来ET", "小鹏G", "理想L", "问界M"]},
+                  "蔚来ET", "小鹏G", "理想L", "问界M", "极氪", "Zeekr",
+                  "文远知行", "WeRide", "HSD", "降价", "交付", "价格"]},
     {"name": "CarNewsChina", "url": "https://carnewschina.com/feed/", "lang": "en",
      "keywords": ["nio", "li auto", "xpeng", "xiaomi", "aito", "huawei",
                   "autonomous", "ads", "ngp", "nop", "ev", "electric",
-                  "zeekr", "byd", "smart"]},
+                  "zeekr", "byd", "smart", "weride", "robotaxi",
+                  "price cut", "delivery", "hsd"]},
     {"name": "汽车之家", "url": "https://www.autohome.com.cn/rss/", "lang": "zh",
      "keywords": ["蔚来", "理想", "小鹏", "小米汽车", "问界", "智驾", "自动驾驶",
-                  "新能源", "电动车", "SU7", "ET5", "L6", "L7", "M5", "M7", "M9"]},
+                  "新能源", "电动车", "SU7", "ET5", "L6", "L7", "M5", "M7", "M9",
+                  "极氪", "Zeekr", "文远知行", "HSD", "降价", "交付", "价格"]},
     {"name": "懂车帝", "url": "https://www.dongchedi.com/rss", "lang": "zh",
      "keywords": ["蔚来", "理想", "小鹏", "小米", "问界", "智驾", "新能源",
-                  "自动驾驶", "SU7", "电动车"]},
+                  "自动驾驶", "SU7", "电动车", "极氪", "Zeekr", "文远知行",
+                  "HSD", "降价", "交付", "价格", "新车"]},
     {"name": "Electrek中国EV", "url": "https://electrek.co/feed/", "lang": "en",
      "keywords": ["nio", "li auto", "xpeng", "xiaomi", "aito", "huawei",
-                  "byd", "zeekr", "chinese ev", "china ev"]},
+                  "byd", "zeekr", "chinese ev", "china ev", "weride",
+                  "robotaxi", "autonomous"]},
     {"name": "InsideEVs中国EV", "url": "https://insideevs.com/rss/", "lang": "en",
      "keywords": ["nio", "li auto", "xpeng", "xiaomi", "aito", "huawei",
-                  "byd", "zeekr", "chinese ev", "china ev"]},
+                  "byd", "zeekr", "chinese ev", "china ev", "weride",
+                  "autonomous"]},
 ]
 
 NOON_GOOGLE_NEWS = [
-    {"name": "Google·蔚来", "query": "蔚来 NIO 智驾 NOP+ 换电", "lang": "zh"},
-    {"name": "Google·理想", "query": "理想汽车 Li Auto NOA 智驾 L6 L7 L8 L9", "lang": "zh"},
-    {"name": "Google·小鹏", "query": "小鹏 XPeng XNGP 智驾 G6 G9 MONA", "lang": "zh"},
-    {"name": "Google·小米汽车", "query": "小米汽车 SU7 智驾 雷军", "lang": "zh"},
-    {"name": "Google·问界", "query": "问界 AITO 华为智驾 ADS M7 M9", "lang": "zh"},
-    {"name": "Google·中国新能源", "query": "中国新能源 智驾 电动车 2025", "lang": "zh"},
-    {"name": "Google·Chinese EV", "query": "NIO XPeng Li Auto Xiaomi EV autonomous", "lang": "en"},
+    {"name": "Google·蔚来", "query": "蔚来 NIO 智驾 NOP+ 换电 交付", "lang": "zh"},
+    {"name": "Google·理想", "query": "理想汽车 Li Auto NOA 智驾 L6 L7 L8 L9 MEGA 交付", "lang": "zh"},
+    {"name": "Google·小鹏", "query": "小鹏 XPeng XNGP 智驾 G6 G9 MONA 交付", "lang": "zh"},
+    {"name": "Google·小米汽车", "query": "小米汽车 SU7 YU7 智驾 雷军 价格", "lang": "zh"},
+    {"name": "Google·问界", "query": "问界 AITO 华为智驾 ADS M7 M9 交付", "lang": "zh"},
+    {"name": "Google·极氪", "query": "极氪 Zeekr 智驾 NZP 001 007 7X 交付 价格", "lang": "zh"},
+    {"name": "Google·文远知行", "query": "文远知行 WeRide Robotaxi 自动驾驶", "lang": "zh"},
+    {"name": "Google·中国新能源智驾", "query": "中国新能源 智驾 自动驾驶 降价 交付", "lang": "zh"},
+    {"name": "Google·Chinese EV Smart", "query": "NIO XPeng Li Auto Xiaomi Zeekr WeRide autonomous smart driving price", "lang": "en"},
 ]
 
 # ============================================================
@@ -964,6 +994,12 @@ def push_wechat_noon(items, brand_items):
     now = datetime.now(BEIJING)
     weekday = WEEKDAYS[now.weekday()]
     lines = [f"## ⚡ 新能源午报", f"> {now.month}月{now.day}日 {weekday}  ·  共{len(items)}条", ""]
+    # Show all brands including those with items
+    shown_brands = set()
+    for item in items:
+        b = item.get("brand", "")
+        if b: shown_brands.add(b)
+    # Show brands in NOON_BRANDS order that have items, then "其他"
     for brand_info in NOON_BRANDS:
         brand_name = brand_info["name"]
         brand_list = [i for i in items if i.get("brand") == brand_name]
@@ -981,6 +1017,23 @@ def push_wechat_noon(items, brand_items):
                 lines.append(f"👤 **{author}** · {date_str} {time_str}")
             else:
                 lines.append(f"**{item['title']}**")
+            lines.append(f"📝 {summary}")
+            if link: lines.append(f"🔗 [原文链接]({link})")
+            lines.append(f"_来源：{source} · {date_str} {time_str}_")
+            lines.append("---")
+            lines.append("")
+    # Show "其他" category items
+    other_items = [i for i in items if i.get("brand") == "其他" or not i.get("brand")]
+    if other_items:
+        lines.append("### 📰 其他新能源动态")
+        lines.append("")
+        for item in other_items:
+            source = item.get("source", "")
+            time_str = item.get("time_short", "")
+            date_str = item.get("date", "")
+            summary = item.get("summary", "")
+            link = item.get("link", "")
+            lines.append(f"**{item['title']}**")
             lines.append(f"📝 {summary}")
             if link: lines.append(f"🔗 [原文链接]({link})")
             lines.append(f"_来源：{source} · {date_str} {time_str}_")
@@ -1075,7 +1128,8 @@ def push_email_noon(items, brand_items):
     now = datetime.now(BEIJING)
     weekday = WEEKDAYS[now.weekday()]
     c1, c2 = "#1a73e8", "#1557b0"
-    brand_colors = {"蔚来": "#1e88e5", "理想": "#43a047", "小鹏": "#ff9800", "小米": "#ff6f00", "问界": "#e53935", "其他": "#9e9e9e"}
+    brand_colors = {"蔚来": "#1e88e5", "理想": "#43a047", "小鹏": "#ff9800", "小米": "#ff6f00",
+                    "问界": "#e53935", "极氪": "#00bcd4", "文远知行": "#9c27b0", "HSD": "#607d8b", "其他": "#9e9e9e"}
     cards = ""
     for brand_info in NOON_BRANDS:
         brand_name = brand_info["name"]
@@ -1096,6 +1150,27 @@ def push_email_noon(items, brand_items):
             cards += f'''
             <div style="padding:14px 16px;background:#fafafa;border-radius:8px;margin-bottom:10px;border-left:3px solid {bc2};">
                 {weibo_tag}
+                <div style="font-weight:700;color:#1a1a1a;font-size:15px;line-height:1.55;">{link_html}</div>
+                <div style="color:#555;font-size:13px;line-height:1.75;margin-top:8px;">{summary}</div>
+                <div style="margin-top:8px;">
+                    {f'<a href="{link}" target="_blank" style="color:#1a73e8;font-size:12px;">🔗 原文链接</a>' if link else ''}
+                    <span style="color:#bbb;font-size:11px;margin-left:12px;">来源：{source} · {date_str} {time_str}</span>
+                </div>
+            </div>'''
+    # Show "其他" category
+    other_items = [i for i in items if i.get("brand") == "其他" or not i.get("brand")]
+    if other_items:
+        bc = brand_colors.get("其他", "#9e9e9e")
+        cards += f'<div style="border-left:4px solid {bc};padding:6px 0 6px 14px;margin:24px 0 14px;"><span style="color:{bc};font-size:16px;font-weight:700;">📰 其他新能源动态</span></div>'
+        for item in other_items:
+            source = item.get("source", "")
+            time_str = item.get("time_short", "")
+            date_str = item.get("date", "")
+            summary = item.get("summary", "")
+            link = item.get("link", "")
+            link_html = f'<a href="{link}" target="_blank" style="color:#1a1a1a;text-decoration:none;">{item["title"]}</a>' if link else item["title"]
+            cards += f'''
+            <div style="padding:14px 16px;background:#fafafa;border-radius:8px;margin-bottom:10px;border-left:3px solid #eee;">
                 <div style="font-weight:700;color:#1a1a1a;font-size:15px;line-height:1.55;">{link_html}</div>
                 <div style="color:#555;font-size:13px;line-height:1.75;margin-top:8px;">{summary}</div>
                 <div style="margin-top:8px;">
