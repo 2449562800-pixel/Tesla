@@ -64,22 +64,33 @@ NITTER_INSTANCES = [
     "nitter.fdn.fr",
 ]
 
-# Strict FSD / Autopilot / Tesla-tech keywords (morning only)
+# Morning keywords — user's 3 focus areas + general Tesla tech
 MORNING_STRICT_KW = [
+    # 1) FSD 动态 (user's top priority)
     "fsd", "full self-driving", "full self driving", "autopilot",
     "self-driving", "self driving", "autonomous driving",
-    "supervised", "unsupervised", "v12", "v13",
+    "supervised", "unsupervised", "v12", "v13", "v14",
     "robotaxi", "robot taxi", "cybercab",
     "tesla ai", "neural net", "vision", "hw3", "hw4",
     "phantom braking", "auto steer", "smart summon", "summon",
     "navigate on autopilot", "noa", "lane change", "merge",
     "park assist", "auto park", "city streets",
+    # 2) 特斯拉软件 OTA (user's 2nd priority)
+    "software update", "ota update", "firmware", "over the air",
+    "release notes", "holiday update", "software version",
+    "update rolling", "update rolling out", "new feature",
+    "sentry mode", "camp mode", "dog mode", "theater mode",
+    # 3) 车辆硬件更新/报道 (user's 3rd priority)
+    "model s", "model 3", "model x", "model y", "cybertruck",
+    "highland", "juniper", "refresh", "redesign", "new model",
+    "range", "battery", "4680", "megapack", "supercharger",
+    "hw5", "ai chip", "camera", "radar", "lidar", "sensor",
+    "motor", "drive unit", "chassis", "suspension",
+    # General Tesla tech
     "optimus", "tesla bot", "humanoid",
-    "software update", "ota update", "firmware",
-    "release notes", "holiday update",
-    "megapack", "supercharger", "4680", "battery",
     "特斯拉FSD", "特斯拉自动驾驶", "特斯拉智驾", "特斯拉AI",
-    "完全自动驾驶", "智能驾驶", "特斯拉软件更新",
+    "完全自动驾驶", "智能驾驶", "特斯拉软件更新", "特斯拉OTA",
+    "特斯拉硬件", "特斯拉更新", "特斯拉新车", "特斯拉改款",
 ]
 
 # Morning overseas RSS feeds (English — primary supplement after Twitter)
@@ -824,13 +835,24 @@ def fetch_morning():
 
     all_items = dedup(all_items)
 
-    # Selection priority: tweets → overseas RSS → domestic RSS → Google News
+    # Selection priority: tweets (per-account cap for diversity) → overseas RSS → domestic RSS → Google News
     tweets = [i for i in all_items if i.get("is_tweet")]
     overseas = [i for i in all_items if not i.get("is_tweet") and i.get("_overseas") and not i.get("_is_google")]
     domestic = [i for i in all_items if not i.get("is_tweet") and not i.get("_overseas") and not i.get("_is_google")]
     google = [i for i in all_items if i.get("_is_google")]
 
-    selected = tweets[:8]
+    # Per-account diversity: max 2 items per Twitter account to spread across all 9 accounts
+    PER_ACCOUNT_MAX = 2
+    account_counts = {}
+    diverse_tweets = []
+    for t in tweets:
+        handle = t.get("author_handle", "unknown")
+        if account_counts.get(handle, 0) < PER_ACCOUNT_MAX:
+            diverse_tweets.append(t)
+            account_counts[handle] = account_counts.get(handle, 0) + 1
+    tweets = diverse_tweets
+
+    selected = tweets[:10]
     remaining = cfg["max"] - len(selected)
     if remaining > 0: selected.extend(overseas[:remaining])
     remaining = cfg["max"] - len(selected)
