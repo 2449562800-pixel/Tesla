@@ -35,7 +35,7 @@ WEEKDAYS = ["周一", "周二", "周三", "周四", "周五", "周六", "周日"
 
 REPORTS = {
     "morning":  {"title": "特斯拉FSD晨报", "emoji": "🌅", "hours": 24, "max": 15},
-    "noon":     {"title": "新能源午报",    "emoji": "⚡", "hours": 10, "max": 15},
+    "noon":     {"title": "新能源午报",    "emoji": "⚡", "hours": 12, "max": 15},
     "evening":  {"title": "前沿科技晚报",  "emoji": "🔬", "hours": 10, "max": 15},
 }
 
@@ -146,28 +146,44 @@ WEIBO_FOUNDERS = [
 ]
 
 NOON_RSS_FEEDS = [
+    {"name": "CnEVPost", "url": "https://cnevpost.com/feed/", "lang": "en",
+     "keywords": ["nio", "li auto", "xpeng", "xiaomi", "aito", "huawei",
+                  "zeekr", "byd", "nio", "ev", "battery swap", "autonomous",
+                  "ads", "ngp", "nop", "intelligent", "smart"]},
     {"name": "36氪汽车", "url": "https://36kr.com/feed", "lang": "zh",
      "keywords": ["蔚来", "理想", "小鹏", "小米汽车", "问界", "NIO", "XPeng",
                   "Li Auto", "Xiaomi Auto", "AITO", "华为智驾", "智驾", "NOA",
-                  "自动驾驶", "新能源车", "电动车"]},
+                  "自动驾驶", "新能源车", "电动车", "新能源"]},
     {"name": "IT之家汽车", "url": "https://www.ithome.com/rss/", "lang": "zh",
      "keywords": ["蔚来", "理想", "小鹏", "小米汽车", "问界", "华为智驾",
-                  "智驾", "NOA", "自动驾驶", "新能源"]},
+                  "智驾", "NOA", "自动驾驶", "新能源", "电动车", "SU7",
+                  "蔚来ET", "小鹏G", "理想L", "问界M"]},
     {"name": "CarNewsChina", "url": "https://carnewschina.com/feed/", "lang": "en",
      "keywords": ["nio", "li auto", "xpeng", "xiaomi", "aito", "huawei",
-                  "autonomous", "ads", "ngp", "nop"]},
+                  "autonomous", "ads", "ngp", "nop", "ev", "electric",
+                  "zeekr", "byd", "smart"]},
     {"name": "汽车之家", "url": "https://www.autohome.com.cn/rss/", "lang": "zh",
-     "keywords": ["蔚来", "理想", "小鹏", "小米汽车", "问界", "智驾", "自动驾驶"]},
+     "keywords": ["蔚来", "理想", "小鹏", "小米汽车", "问界", "智驾", "自动驾驶",
+                  "新能源", "电动车", "SU7", "ET5", "L6", "L7", "M5", "M7", "M9"]},
     {"name": "懂车帝", "url": "https://www.dongchedi.com/rss", "lang": "zh",
-     "keywords": ["蔚来", "理想", "小鹏", "小米", "问界", "智驾"]},
+     "keywords": ["蔚来", "理想", "小鹏", "小米", "问界", "智驾", "新能源",
+                  "自动驾驶", "SU7", "电动车"]},
+    {"name": "Electrek中国EV", "url": "https://electrek.co/feed/", "lang": "en",
+     "keywords": ["nio", "li auto", "xpeng", "xiaomi", "aito", "huawei",
+                  "byd", "zeekr", "chinese ev", "china ev"]},
+    {"name": "InsideEVs中国EV", "url": "https://insideevs.com/rss/", "lang": "en",
+     "keywords": ["nio", "li auto", "xpeng", "xiaomi", "aito", "huawei",
+                  "byd", "zeekr", "chinese ev", "china ev"]},
 ]
 
 NOON_GOOGLE_NEWS = [
-    {"name": "Google·蔚来", "query": "蔚来 NIO 智驾 NOP+", "lang": "zh"},
-    {"name": "Google·理想", "query": "理想汽车 Li Auto NOA 智驾", "lang": "zh"},
-    {"name": "Google·小鹏", "query": "小鹏 XPeng XNGP 智驾", "lang": "zh"},
-    {"name": "Google·小米汽车", "query": "小米汽车 SU7 智驾", "lang": "zh"},
-    {"name": "Google·问界", "query": "问界 AITO 华为智驾 ADS", "lang": "zh"},
+    {"name": "Google·蔚来", "query": "蔚来 NIO 智驾 NOP+ 换电", "lang": "zh"},
+    {"name": "Google·理想", "query": "理想汽车 Li Auto NOA 智驾 L6 L7 L8 L9", "lang": "zh"},
+    {"name": "Google·小鹏", "query": "小鹏 XPeng XNGP 智驾 G6 G9 MONA", "lang": "zh"},
+    {"name": "Google·小米汽车", "query": "小米汽车 SU7 智驾 雷军", "lang": "zh"},
+    {"name": "Google·问界", "query": "问界 AITO 华为智驾 ADS M7 M9", "lang": "zh"},
+    {"name": "Google·中国新能源", "query": "中国新能源 智驾 电动车 2025", "lang": "zh"},
+    {"name": "Google·Chinese EV", "query": "NIO XPeng Li Auto Xiaomi EV autonomous", "lang": "en"},
 ]
 
 # ============================================================
@@ -841,10 +857,15 @@ def fetch_noon():
         if b in brand_items: brand_items[b].append(item)
         else: item["brand"] = "其他"; brand_items["其他"].append(item)
 
+    # Select items: prioritize brand-matched, then fill with "其他"
     selected = []
     per_brand = max(3, cfg["max"] // len(NOON_BRANDS))
-    for brand_name in [b["name"] for b in NOON_BRANDS] + ["其他"]:
+    for brand_name in [b["name"] for b in NOON_BRANDS]:
         selected.extend(brand_items.get(brand_name, [])[:per_brand])
+    # Fill remaining slots with "其他" items
+    remaining = cfg["max"] - len(selected)
+    if remaining > 0:
+        selected.extend(brand_items.get("其他", [])[:remaining])
     selected = selected[:cfg["max"]]
     selected = finalize_items(selected)
 
