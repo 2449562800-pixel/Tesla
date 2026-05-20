@@ -1,0 +1,76 @@
+name: Smart Scheduler
+
+on:
+  schedule:
+    # Every 2 hours to keep repo active and trigger reports at right times
+    - cron: '5 0,2,4,6,8,10,12,14,16,18,20,22 * * *'
+  workflow_dispatch:
+
+jobs:
+  scheduler:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.PAT_TOKEN }}
+
+      - name: Check time and trigger report
+        id: check
+        env:
+          PAT_TOKEN: ${{ secrets.PAT_TOKEN }}
+        run: |
+          HOUR=$(date -u +%H)
+          MINUTE=$(date -u +%M)
+          echo "Current UTC time: $HOUR:$MINUTE"
+
+          # Determine if it's time for a report
+          REPORT=""
+          if [ "$HOUR" = "00" ] && [ "$MINUTE" -ge "0" ] && [ "$MINUTE" -lt "30" ]; then
+            REPORT="morning"
+            echo "⏰ Time for MORNING report (08:00 Beijing)"
+          elif [ "$HOUR" = "04" ] && [ "$MINUTE" -ge "0" ] && [ "$MINUTE" -lt "30" ]; then
+            REPORT="noon"
+            echo "⏰ Time for NOON report (12:00 Beijing)"
+          elif [ "$HOUR" = "09" ] && [ "$MINUTE" -ge "30" ] && [ "$MINUTE" -lt "59" ]; then
+            REPORT="evening"
+            echo "⏰ Time for EVENING report (17:30 Beijing)"
+          else
+            echo "⏳ Not report time, just keeping repo alive (UTC $HOUR:$MINUTE)"
+          fi
+
+          # Trigger the news workflow if it's report time
+          if [ -n "$REPORT" ]; then
+            RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X POST \
+              -H "Authorization: token $PAT_TOKEN" \
+              -H "Accept: application/vnd.github.v3+json" \
+              -H "Content-Type: application/json" \
+              -d "{\"ref\":\"main\",\"inputs\":{\"report_type\":\"$REPORT\"}}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/workflows/279217004/dispatches")
+            echo "Triggered $REPORT report, API response: $RESPONSE"
+            if [ "$RESPONSE" = "204" ]; then
+              echo "✅ Successfully triggered $REPORT report!"
+            else
+              echo "❌ Failed to trigger, HTTP status: $RESPONSE"
+            fi
+          fi
+
+          echo "report=$REPORT" >> $GITHUB_OUTPUT
+
+      - name: Keep alive - update timestamp
+        run: |
+          TIMESTAMP=$(date -u +"%Y-%m-%d %H:%M:%S UTC")
+          REPORT=${{ steps.check.outputs.report }}
+          echo "Last scheduler run: $TIMESTAMP" > .scheduler-last-run
+          if [ -n "$REPORT" ]; then
+            echo "Last report triggered: $REPORT at $TIMESTAMP" >> .scheduler-last-run
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add .scheduler-last-run
+          git diff --cached --quiet || git commit -m "scheduler: keep-alive $TIMESTAMP"
+          git push
+          echo "✅ Keep-alive commit pushed"
